@@ -4,9 +4,9 @@ import os
 
 app = Flask(__name__)
 app.config.from_object(__name__)
-
+app.secret_key = 'ss'
 app.config.update(dict(
-    DATABASE=os.path.join(app.root_path, 'user_stories.db')
+    DATABASE=os.path.join(app.root_path, 'user_stories.db'),
 ))
 app.config.from_envvar('USM_SETTINGS', silent=True)
 
@@ -43,12 +43,74 @@ def close_db(error):
 
 
 @app.route('/')
-def show_entries():
+@app.route('/list')
+def list():
     db = get_db()
-    cur = db.execute('select ID, Story_Title, User_Story, Acceptance_Criteria, Business_Value, Estimation, Status from user_stories order by ID desc')
-    entries = cur.fetchall
-    return render_template('index.html', entries=entries)
+    cur = db.execute('select * from user_stories order by ID asc')
+    entries = cur.fetchall()
+    return render_template('list.html', entries=entries)
 
-@app.route('/story')
+
+@app.route('/story/submit', methods=['POST'])
 def story():
-    return render_template('index.html')
+    db = get_db()
+    db.execute("""insert into user_stories (Story_Title, User_Story, Acceptance_Criteria, Business_Value, Estimation, Status)
+               values (?, ?, ?, ?, ?, ?)""",
+               [request.form['Story_Title'],
+                request.form['User_Story'],
+                request.form['Acceptance_Criteria'],
+                request.form['Business_Value'],
+                request.form['Estimation'],
+                request.form['Status']])
+    db.commit()
+    flash('New story was succesfully added')
+    return redirect(url_for('list'))
+
+
+@app.route('/story', methods=['GET'])
+def get_form():
+    entry = []
+    return render_template('form.html', entry=entry)
+
+
+@app.route('/delete/<id>', methods=['POST'])
+def delete_story(id):
+    db = get_db()
+    db.execute("""DELETE from user_stories where ID=?""", [id])
+    db.commit()
+    return redirect(url_for('list'))
+
+
+@app.route('/update/<id>', methods=['POST'])
+def update_story(id):
+    db = get_db()
+    db.execute("""UPDATE user_stories SET
+               Story_Title=?, User_Story=?, Acceptance_Criteria=?, Business_Value=?, Estimation=?, Status=? WHERE id=?""",
+               [request.form['Story_Title'], request.form['User_Story'],
+                request.form['Acceptance_Criteria'], request.form['Business_Value'],
+                request.form['Estimation'], request.form['Status'], [id]])
+    db.commit()
+    return redirect(url_for('list'))
+
+
+@app.route('/story/<id>', methods=['GET'])
+def filled_form(id):
+    db = get_db()
+    story = fetch_data(id, db)
+    return render_template('form.html', route='update_story', methods=['POST'], id=id, user_story=story)
+
+
+def fetch_data(id, db):
+    titles = ('Story_Title', 'User_Story', 'Acceptance_Criteria',
+              'Business_Value', 'Estimation', 'Status')
+    user_story = {}
+    cur = db.execute("""SELECT Story_Title, User_Story, Acceptance_Criteria,
+                  Business_Value, Estimation, Status FROM user_stories WHERE ID=?""", [id])
+    try:
+        story = cur.fetchall()[0]
+        for i, title in enumerate(titles):
+            print(story[i], title)
+            user_story[title] = story[i]
+        return user_story
+    except IndexError:
+        return user_story
