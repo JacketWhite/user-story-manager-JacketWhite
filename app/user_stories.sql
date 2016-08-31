@@ -5,8 +5,8 @@ CREATE TABLE user_stories (
     `User_Story` text not null,
     `Acceptance_Criteria` text,
     `Business_Value` integer,
-    `Estimation` integer,
-    `Status` integer
+    `Estimation` float,
+    `Status` text
 );
 INSERT INTO user_stories VALUES (1.0,'System / Handle new application','As an Administrator,
 I want to automate the process of incoming applications
